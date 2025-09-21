@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -71,7 +71,7 @@ const ConfigurationDialog: React.FC<ConfigurationDialogProps> = ({
   );
 
   // Fetch available models when API key and base URL are available
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     if (!config.apiKey.trim() || !config.baseUrl.trim()) {
       setAvailableModels([]);
       setModelsError(null);
@@ -95,7 +95,7 @@ const ConfigurationDialog: React.FC<ConfigurationDialogProps> = ({
     } finally {
       setIsLoadingModels(false);
     }
-  };
+  }, [config.apiKey, config.baseUrl, config.model]);
 
   // Handle base URL changes
   const handleEndpointChange = (endpoint: string) => {
@@ -120,7 +120,7 @@ const ConfigurationDialog: React.FC<ConfigurationDialogProps> = ({
   // Fetch models when API key or base URL changes
   useEffect(() => {
     fetchModels();
-  }, [config.apiKey, config.baseUrl]);
+  }, [config.apiKey, config.baseUrl, fetchModels]);
 
   // Initialize selected endpoint based on current base URL
   useEffect(() => {

@@ -37,7 +37,7 @@ import {
 import { apiService } from './apiService';
 import ConfigurationDialog from './components/ConfigurationDialog';
 import StepNavigation from './components/StepNavigation';
-import { loadSettings, saveSettings, SecureStorageData, PRESET_ENDPOINTS, clearSettings, cleanupCorruptedData } from './secureStorage';
+import { loadSettings, saveSettings, clearSettings, cleanupCorruptedData } from './secureStorage';
 
 const theme = createTheme({
   palette: {
@@ -392,7 +392,7 @@ function App() {
         }));
       }
     }
-  }, [workflowState.config, workflowState.isProcessing, messages]);
+  }, [workflowState.config, workflowState.isProcessing, workflowState.steps, messages, chapterCount, getCurrentApiKey, mapModelForProvider, parseChapterCountFromResponse, storyPrompt]);
 
   const processChapter = useCallback(async (chapterId: number) => {
     if (workflowState.isProcessing) return;
@@ -456,7 +456,7 @@ function App() {
         }));
       }
     }
-  }, [workflowState.config, workflowState.isProcessing, workflowState.steps, messages, storyPrompt, chapterCount, workflowState]);
+  }, [workflowState.config, workflowState.isProcessing, messages, storyPrompt, getCurrentApiKey, mapModelForProvider]);
 
   const advanceToNextStep = useCallback(() => {
     if (workflowState.currentStep < WORKFLOW_STEPS.length - 1) {
@@ -560,7 +560,6 @@ function App() {
   };
 
   const resetStoryData = () => {
-    const currentApiKey = getCurrentApiKey();
     const currentModel = workflowState.config.model;
     const currentTemperature = workflowState.config.temperature;
     const currentBaseUrl = workflowState.config.baseUrl;
@@ -617,7 +616,7 @@ function App() {
         chapterCount
       }
     }));
-  }, [storyPrompt, chapterCount, workflowState.config]);
+  }, [storyPrompt, chapterCount, getCurrentApiKey]);
 
   return (
     <ThemeProvider theme={theme}>

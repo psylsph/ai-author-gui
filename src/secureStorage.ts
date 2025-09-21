@@ -29,7 +29,6 @@ export type PresetEndpointKey = keyof typeof PRESET_ENDPOINTS;
 export function saveSettings(settings: Partial<SecureStorageData>): void {
   try {
     const existingData = loadSettings();
-    const updatedData = { ...existingData, ...settings };
 
     const dataToStore = {
       model: settings.model || existingData.model,
