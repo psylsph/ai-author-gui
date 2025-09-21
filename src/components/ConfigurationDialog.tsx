@@ -21,6 +21,7 @@ import {
 import { StoryConfig } from '../types';
 import { saveSettings, PRESET_ENDPOINTS } from '../secureStorage';
 import { apiService } from '../apiService';
+import { getDefaultConfigFromEnv } from '../env';
 
 interface ConfigurationDialogProps {
   open: boolean;
@@ -29,18 +30,12 @@ interface ConfigurationDialogProps {
   initialConfig?: Partial<StoryConfig>;
 }
 
-const DEFAULT_CONFIG: StoryConfig = {
-  model: 'deepseek-reasoner',
-  temperature: undefined, // Optional - only sent to API if set
-  apiKey: '',
-  baseUrl: 'https://api.deepseek.com',
-  stream: true
-};
+const DEFAULT_CONFIG: StoryConfig = getDefaultConfigFromEnv();
 
 // Model suggestions for different providers
 const PROVIDER_MODELS: Record<string, string[]> = {
   'https://api.deepseek.com': ['deepseek-reasoner', 'deepseek-chat'],
-  'https://openrouter.ai/api/v1': ['deepseek/deepseek-r1', 'openai/gpt-4', 'openai/gpt-3.5-turbo', 'anthropic/claude-3-sonnet-20240229'],
+  'https://openrouter.ai/api/v1': ['meta-llama/llama-3.3-70b-instruct:free', 'openai/gpt-4', 'openai/gpt-3.5-turbo', 'anthropic/claude-3-sonnet-20240229'],
   'https://api.openai.com/v1': ['gpt-4', 'gpt-3.5-turbo'],
   'http://localhost:11434': ['llama2', 'codellama', 'mistral'],
   'http://localhost:1234': ['local-model']
@@ -144,6 +139,10 @@ const ConfigurationDialog: React.FC<ConfigurationDialogProps> = ({
 
     if (config.temperature !== undefined && (config.temperature < 0 || config.temperature > 2)) {
       newErrors.temperature = 'Temperature must be between 0 and 2';
+    }
+
+    if (config.chapterWordTarget !== undefined && (config.chapterWordTarget < 500 || config.chapterWordTarget > 10000)) {
+      newErrors.chapterWordTarget = 'Chapter word target must be between 500 and 10,000';
     }
 
     setErrors(newErrors);
@@ -295,6 +294,17 @@ const ConfigurationDialog: React.FC<ConfigurationDialogProps> = ({
              error={!!errors.temperature}
              helperText={errors.temperature || "Leave empty to use model's default temperature"}
              inputProps={{ min: 0, max: 2, step: 0.1 }}
+             fullWidth
+           />
+
+           <TextField
+             label="Chapter Word Target"
+             type="number"
+             value={config.chapterWordTarget || ''}
+             onChange={(e) => handleChange('chapterWordTarget', e.target.value ? parseInt(e.target.value) : undefined)}
+             error={!!errors.chapterWordTarget}
+             helperText={errors.chapterWordTarget || "Target word count per chapter (default: 3000)"}
+             inputProps={{ min: 500, max: 10000, step: 100 }}
              fullWidth
            />
 

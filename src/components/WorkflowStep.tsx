@@ -175,7 +175,10 @@ const WorkflowStep: React.FC<WorkflowStepProps> = ({
           {onAdvanceStep && step.completed && canAdvance && (
             <Button
               startIcon={<SkipNextIcon />}
-              onClick={onAdvanceStep}
+              onClick={() => {
+                console.log('Next Step button clicked for step:', step.id);
+                onAdvanceStep();
+              }}
               variant="outlined"
               size="small"
             >

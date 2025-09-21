@@ -27,6 +27,7 @@ export interface StoryConfig {
   apiKey: string; // Current API key for selected base URL
   baseUrl: string;
   stream: boolean;
+  chapterWordTarget?: number; // Target word count per chapter (default: 3000)
 }
 
 export interface WorkflowState {

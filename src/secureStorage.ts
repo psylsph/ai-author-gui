@@ -12,6 +12,7 @@ export interface SecureStorageData {
   temperature?: number; // Optional - only sent to API if set
   baseUrl: string;
   stream: boolean;
+  chapterWordTarget?: number; // Target word count per chapter
 }
 
 // Preset API endpoints
@@ -35,6 +36,7 @@ export function saveSettings(settings: Partial<SecureStorageData>): void {
       temperature: settings.temperature ?? existingData.temperature,
       baseUrl: settings.baseUrl || existingData.baseUrl,
       stream: settings.stream ?? existingData.stream,
+      chapterWordTarget: settings.chapterWordTarget ?? existingData.chapterWordTarget,
       apiKeys: { ...existingData.apiKeys }
     };
 
@@ -64,7 +66,8 @@ export function loadSettings(): SecureStorageData {
         model: 'deepseek/deepseek-r1', // Better default for OpenRouter
         temperature: undefined, // Optional - only sent to API if set
         baseUrl: 'https://api.deepseek.com',
-        stream: true
+        stream: true,
+        chapterWordTarget: 3000 // Default target word count per chapter
       };
     }
 
@@ -75,7 +78,8 @@ export function loadSettings(): SecureStorageData {
       model: parsedData.model || 'deepseek-reasoner',
       temperature: parsedData.temperature, // Keep as undefined if not set
       baseUrl: parsedData.baseUrl || 'https://api.deepseek.com',
-      stream: parsedData.stream ?? true
+      stream: parsedData.stream ?? true,
+      chapterWordTarget: parsedData.chapterWordTarget // Keep as undefined if not set
     };
   } catch (error) {
     console.error('Failed to load settings:', error);
@@ -85,7 +89,8 @@ export function loadSettings(): SecureStorageData {
       model: 'deepseek/deepseek-r1', // Better default for OpenRouter
       temperature: undefined, // Optional - only sent to API if set
       baseUrl: 'https://api.deepseek.com',
-      stream: true
+      stream: true,
+      chapterWordTarget: 3000 // Default target word count per chapter
     };
   }
 }

@@ -10,9 +10,10 @@ A modern TypeScript React application that helps you create compelling stories u
 - **File Upload Support**: Upload text files (.txt, .md) for story prompts
 - **Default Prompts**: Includes helpful default prompts to get started quickly
 - **Caching System**: Built-in response caching to avoid repeated API calls
-- **Chapter Generation**: Write multiple chapters with word count validation
+- **Chapter Generation**: Write multiple chapters with configurable word count targets, streaming support, feedback functionality, and full chapter text display
 - **Export Functionality**: Download your complete story as a text file
 - **Modern UI**: Beautiful Material-UI interface with responsive design
+- **Environment Variables**: Support for API keys via .env file for local development
 
 ## Getting Started
 
@@ -35,10 +36,46 @@ cd ai-author-gui
 npm install
 ```
 
-3. Start the development server:
+3. **Set up environment variables** (optional):
+   - Copy `.env.example` to `.env`
+   - Fill in your API keys:
+   ```bash
+   cp .env.example .env
+   ```
+   - Edit `.env` with your actual API keys
+
+4. Start the development server:
 ```bash
 npm start
 ```
+
+### Environment Variables
+
+You can configure API keys using environment variables for local development:
+
+1. **Copy the example file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit `.env` with your API keys:**
+   ```bash
+   # OpenAI API Configuration
+   REACT_APP_OPENAI_API_KEY=your_openai_api_key_here
+   REACT_APP_OPENAI_BASE_URL=https://api.openai.com/v1
+
+   # DeepSeek API Configuration
+   REACT_APP_DEEPSEEK_API_KEY=your_deepseek_api_key_here
+   REACT_APP_DEEPSEEK_BASE_URL=https://api.deepseek.com
+
+   # OpenRouter API Configuration (Free models)
+   REACT_APP_OPENROUTER_API_KEY=your_openrouter_api_key_here
+   REACT_APP_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+   ```
+
+3. **Restart the development server** after making changes to `.env`
+
+**Note:** Environment variables take precedence over localStorage settings. If both are configured, environment variables will be used.
 
 4. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
@@ -46,9 +83,10 @@ npm start
 
 1. **Story Settings**: Enter your story prompt directly on the main page, upload a text file, or use the default children's story prompt
 2. **API Settings**: Click the "API Settings" button to configure:
-   - API key (OpenAI or DeepSeek)
-   - AI model selection
-   - Temperature and other advanced settings
+    - API key (OpenAI or DeepSeek)
+    - AI model selection
+    - Temperature and other advanced settings
+    - Chapter word target (default: 3000 words per chapter)
 3. Click "Save Configuration" to apply API settings
 
 ## Usage
@@ -87,6 +125,80 @@ npm run build
    - Set publish directory: `build`
    - Add environment variables if needed
 
+### Docker Deployment
+
+Deploy the application using Docker for easy local development and production deployment:
+
+#### Prerequisites
+- Docker installed on your system
+- Docker Compose (optional, for easier deployment)
+
+#### Quick Start with Deployment Script (Easiest)
+
+1. **Run the deployment script**:
+```bash
+./deploy.sh
+```
+
+2. **Open your browser**: Navigate to `http://localhost:3000`
+
+#### Quick Start with Docker Compose (Recommended)
+
+1. **Build and run with one command**:
+```bash
+docker-compose up --build
+```
+
+2. **Open your browser**: Navigate to `http://localhost:3000`
+
+3. **Stop the application**:
+```bash
+docker-compose down
+```
+
+#### Manual Docker Commands
+
+1. **Build the Docker image**:
+```bash
+docker build -t ai-story-author .
+```
+
+2. **Run the container**:
+```bash
+docker run -p 3000:80 ai-story-author
+```
+
+3. **Open your browser**: Navigate to `http://localhost:3000`
+
+#### Docker Features
+
+- **Multi-stage build**: Optimized image size using Node.js for building and Nginx for serving
+- **Nginx configuration**: Proper SPA routing support and security headers
+- **Static asset caching**: Optimized performance for production
+- **Health checks**: Built-in container health monitoring
+- **Environment variables**: Support for custom configuration
+
+#### Production Deployment
+
+For production deployment with Docker:
+
+1. **Build for production**:
+```bash
+docker build -t ai-story-author:prod .
+```
+
+2. **Run with production settings**:
+```bash
+docker run -d -p 80:80 --restart unless-stopped ai-story-author:prod
+```
+
+#### Docker Image Details
+
+- **Base image**: `nginx:alpine` (lightweight and secure)
+- **Port**: 80 (mapped to 3000 locally)
+- **Health check**: Built-in endpoint monitoring
+- **Security**: Non-root container with security headers
+
 ### Environment Variables
 
 For production deployment, you may want to set:
@@ -105,15 +217,22 @@ For production deployment, you may want to set:
 ## Project Structure
 
 ```
-src/
-├── components/          # React components
-│   ├── ConfigurationDialog.tsx
-│   ├── StepContent.tsx
-│   └── ChapterContent.tsx
-├── types.ts            # TypeScript interfaces
-├── apiService.ts       # API integration with caching
-├── workflowUtils.ts    # Story generation utilities
-└── App.tsx            # Main application component
+├── src/
+│   ├── components/          # React components
+│   │   ├── ConfigurationDialog.tsx
+│   │   ├── StepContent.tsx
+│   │   └── ChapterContent.tsx
+│   ├── types.ts            # TypeScript interfaces
+│   ├── apiService.ts       # API integration with caching
+│   ├── workflowUtils.ts    # Story generation utilities
+│   └── App.tsx            # Main application component
+├── public/                 # Static assets
+├── Dockerfile             # Docker container configuration
+├── docker-compose.yml     # Docker Compose orchestration
+├── nginx.conf            # Nginx server configuration
+├── deploy.sh             # Easy deployment script
+├── .dockerignore         # Docker build optimization
+└── netlify.toml          # Netlify deployment configuration
 ```
 
 ## Contributing

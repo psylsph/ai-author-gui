@@ -31,13 +31,13 @@ import {
   Message,
   WORKFLOW_STEPS,
   WorkflowStep,
-  Chapter,
-  CHAPTER_MIN_WORDS
+  Chapter
 } from './types';
 import { apiService } from './apiService';
 import ConfigurationDialog from './components/ConfigurationDialog';
 import StepNavigation from './components/StepNavigation';
 import { loadSettings, saveSettings, clearSettings, cleanupCorruptedData } from './secureStorage';
+import { getApiKeyFromEnv, getDefaultConfigFromEnv } from './env';
 
 const theme = createTheme({
   palette: {
@@ -74,13 +74,17 @@ const createInitialChapters = (count: number): Chapter[] => {
   }));
 };
 
-const createDefaultConfig = (): StoryConfig => ({
-  model: 'meta-llama/llama-3.3-70b-instruct:free', // Better default for OpenRouter
-  temperature: undefined, // Optional - only sent to API if set
-  apiKey: '',
-  baseUrl: 'https://openrouter.ai/api/v1',
-  stream: true
-});
+const createDefaultConfig = (): StoryConfig => {
+  const envConfig = getDefaultConfigFromEnv();
+  return {
+    model: envConfig.model,
+    temperature: envConfig.temperature,
+    apiKey: envConfig.apiKey,
+    baseUrl: envConfig.baseUrl,
+    stream: envConfig.stream,
+    chapterWordTarget: envConfig.chapterWordTarget,
+  };
+};
 
 // Common model mappings for different providers
 const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
@@ -176,6 +180,13 @@ function App() {
 
   // Get current API key for selected base URL
   const getCurrentApiKey = useCallback(() => {
+    // First check environment variables
+    const envApiKey = getApiKeyFromEnv(workflowState.config.baseUrl);
+    if (envApiKey) {
+      return envApiKey;
+    }
+
+    // Fall back to localStorage
     return apiKeys[workflowState.config.baseUrl] || '';
   }, [apiKeys, workflowState.config.baseUrl]);
 
@@ -201,6 +212,16 @@ function App() {
 
     loadStoredSettings();
   }, []);
+
+  // Re-initialize chapters when chapter count changes
+  React.useEffect(() => {
+    if (workflowState.currentStep > 0) {
+      setWorkflowState(prev => ({
+        ...prev,
+        chapters: createInitialChapters(chapterCount)
+      }));
+    }
+  }, [chapterCount, workflowState.currentStep]);
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -271,7 +292,8 @@ function App() {
         prompt = `Original Story Prompt:\n${storyPrompt}\n\nWith a view to making the writing more human, discuss how a human might approach this particular piece (given the original prompt). Discuss telltale LLM approaches to writing (generally) and ways they might not serve this particular piece. For example, common LLM failings are to write safely, or to always wrap things up with a bow, or trying to write impressively at the expense of readability. Then do a deep dive on the intention & plan, critiquing ways it might be falling into typical LLM tropes & pitfalls. Brainstorm ideas to make it more human. Be comprehensive. We aren't doing any rewriting of the plan yet, just critique & brainstorming.`;
       } else if (stepId === 4) {
         // Step 4: Final Plan - include original prompt and all previous context
-        prompt = `Original Story Prompt:\n${storyPrompt}\n\nOk now with these considerations in mind, formulate the final plan for a human like, compelling short piece in ${chapterCount} chapters. Bear in mind the constraints of the piece (each chapter is just 3000 words). Above all things, the plan must serve the original prompt. We will use the same format as before:\n# Intention\n<State your formulated intentions for the piece, synthesised from the parts of the brainstorming session that worked, and avoiding the parts that didn't. Be explicit about the choices you have made about plot, voice, stylistic choices, things you intend to aim for & avoid.>\n# Chapter Planning\n<Write a brief chapter plan for all ${chapterCount} chapters.>`;
+        const wordTarget = workflowState.config.chapterWordTarget || 3000;
+        prompt = `Original Story Prompt:\n${storyPrompt}\n\nOk now with these considerations in mind, formulate the final plan for a human like, compelling short piece in ${chapterCount} chapters. Bear in mind the constraints of the piece (each chapter is approximately ${wordTarget} words). Above all things, the plan must serve the original prompt. We will use the same format as before:\n# Intention\n<State your formulated intentions for the piece, synthesised from the parts of the brainstorming session that worked, and avoiding the parts that didn't. Be explicit about the choices you have made about plot, voice, stylistic choices, things you intend to aim for & avoid.>\n# Chapter Planning\n<Write a brief chapter plan for all ${chapterCount} chapters.>`;
       } else if (stepId === 5) {
         // Step 5: Characters - include original prompt and all previous context
         prompt = `Original Story Prompt:\n${storyPrompt}\n\nPerfect. Now with the outline more crystallised, and bearing in mind the discussion on human writing vs LLM pitfalls, we will flesh out our characters. Lets go through each of our main characters:\n- Write about their background, personality, idiosyncrasies, flaws. Be specific and come up with examples to anchor & ground the character's profile (both core and trivial)\n- Briefly describe their physicality: appearance, how they carry themselves, express, interact with the world.\n- Concisely detail their motives, allegiances and existing relationships. Think from the perspective of the character as a real breathing thinking feeling individual in this world.\n- Write a couple quotes of flavour dialogue / internal monologue from the character to experiment with their voice.\nOutput like this:\n# Character 1 name\n<character exploration>\n# Character 2 name\n<character exploration>\n etc`;
@@ -304,8 +326,8 @@ function App() {
             }
           );
 
-          for await (const _chunk of streamGenerator) {
-            // Streaming is handled by the callback above
+          for await (const chunk of streamGenerator) {
+            console.info('Received chunk:', chunk);
           }
         } catch (error) {
           console.error('Streaming error:', error);
@@ -401,38 +423,107 @@ function App() {
       ...prev,
       isProcessing: true,
       error: undefined,
+      streamingContent: '',
+      isStreaming: workflowState.config.stream,
       chapters: prev.chapters.map(chapter =>
-        chapter.id === chapterId ? { ...chapter, isProcessing: true } : chapter
+        chapter.id === chapterId ? { ...chapter, isProcessing: true, content: '' } : chapter
       )
     }));
 
     try {
-      const chapterPrompt = `Original Story Prompt:\n${storyPrompt}\n\nWrite Chapter ${chapterId} of the story, following the approved plan and prior chapters.\n- Produce at least ${CHAPTER_MIN_WORDS} words of narrative prose.\n- Count only the words in your final story text; do not include planning notes or analysis.\n- Output only the polished chapter text (you may open with a 'Chapter ${chapterId}' heading if that matches the style), and do not mention the word count or include any commentary.`;
+      const wordTarget = workflowState.config.chapterWordTarget || 3000;
+
+      // Get feedback for current chapter
+      const currentChapter = workflowState.chapters.find(chapter => chapter.id === chapterId);
+      const chapterFeedback = currentChapter?.feedback || '';
+
+      let chapterPrompt = `Original Story Prompt:\n${storyPrompt}\n\nWrite Chapter ${chapterId} of the story, following the approved plan and prior chapters.\n- Produce at least ${wordTarget} words of narrative prose.\n- Count only the words in your final story text; do not include planning notes or analysis.\n- Output only the polished chapter text (you may open with a 'Chapter ${chapterId}' heading if that matches the style), and do not mention the word count or include any commentary.`;
+
+      // Add feedback to the prompt if it exists
+      if (chapterFeedback.trim()) {
+        chapterPrompt += `\n\n--- FEEDBACK TO APPLY ---\n${chapterFeedback}\n\nPlease incorporate this feedback into your response above.`;
+      }
 
       const chapterMessages: Message[] = [...messages, { role: 'user', content: chapterPrompt }];
 
-      const mappedModel = mapModelForProvider(workflowState.config.model, workflowState.config.baseUrl);
-      const content = await apiService.chatCompletion(
-        chapterMessages,
-        mappedModel,
-        workflowState.config.temperature,
-        getCurrentApiKey(),
-        workflowState.config.baseUrl
-      );
+      if (workflowState.config.stream) {
+        // Use streaming for chapter writing
+        let fullContent = '';
+        try {
+          const mappedModel = mapModelForProvider(workflowState.config.model, workflowState.config.baseUrl);
+          const streamGenerator = apiService.chatCompletionStream(
+            chapterMessages,
+            mappedModel,
+            workflowState.config.temperature,
+            getCurrentApiKey(),
+            workflowState.config.baseUrl,
+            (chunk: string) => {
+              fullContent += chunk;
+              setWorkflowState(prev => ({
+                ...prev,
+                streamingContent: fullContent
+              }));
+            }
+          );
 
-      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+          for await (const _chunk of streamGenerator) {
+            // Streaming is handled by the callback above
+            console.info('Received chapter chunk' + _chunk);
+          }
+        } catch (error) {
+          console.error('Chapter streaming error:', error);
+          // Fallback to regular API call
+          const mappedModel = mapModelForProvider(workflowState.config.model, workflowState.config.baseUrl);
+          const content = await apiService.chatCompletion(
+            chapterMessages,
+            mappedModel,
+            workflowState.config.temperature,
+            getCurrentApiKey(),
+            workflowState.config.baseUrl
+          );
+          fullContent = content;
+        }
 
-      setWorkflowState(prev => ({
-        ...prev,
-        chapters: prev.chapters.map(chapter =>
-          chapter.id === chapterId
-            ? { ...chapter, content, wordCount, completed: true, isProcessing: false }
-            : chapter
-        ),
-        isProcessing: false
-      }));
+        const wordCount = fullContent.split(/\s+/).filter(word => word.length > 0).length;
 
-      setMessages(prev => [...prev, { role: 'assistant', content }]);
+        setWorkflowState(prev => ({
+          ...prev,
+          chapters: prev.chapters.map(chapter =>
+            chapter.id === chapterId
+              ? { ...chapter, content: fullContent, wordCount, completed: true, isProcessing: false }
+              : chapter
+          ),
+          isProcessing: false,
+          streamingContent: '',
+          isStreaming: false
+        }));
+
+        setMessages(prev => [...prev, { role: 'assistant', content: fullContent }]);
+      } else {
+        // Use regular API call for chapter writing
+        const mappedModel = mapModelForProvider(workflowState.config.model, workflowState.config.baseUrl);
+        const content = await apiService.chatCompletion(
+          chapterMessages,
+          mappedModel,
+          workflowState.config.temperature,
+          getCurrentApiKey(),
+          workflowState.config.baseUrl
+        );
+
+        const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+
+        setWorkflowState(prev => ({
+          ...prev,
+          chapters: prev.chapters.map(chapter =>
+            chapter.id === chapterId
+              ? { ...chapter, content, wordCount, completed: true, isProcessing: false }
+              : chapter
+          ),
+          isProcessing: false
+        }));
+
+        setMessages(prev => [...prev, { role: 'assistant', content }]);
+      }
 
     } catch (error) {
       // Check if this was a cancellation
@@ -440,6 +531,8 @@ function App() {
         setWorkflowState(prev => ({
           ...prev,
           isProcessing: false,
+          streamingContent: '',
+          isStreaming: false,
           chapters: prev.chapters.map(chapter =>
             chapter.id === chapterId ? { ...chapter, isProcessing: false } : chapter
           ),
@@ -449,6 +542,8 @@ function App() {
         setWorkflowState(prev => ({
           ...prev,
           isProcessing: false,
+          streamingContent: '',
+          isStreaming: false,
           chapters: prev.chapters.map(chapter =>
             chapter.id === chapterId ? { ...chapter, isProcessing: false } : chapter
           ),
@@ -456,15 +551,23 @@ function App() {
         }));
       }
     }
-  }, [workflowState.config, workflowState.isProcessing, messages, storyPrompt, getCurrentApiKey, mapModelForProvider]);
+  }, [workflowState.config, workflowState.isProcessing, workflowState.chapters, messages, storyPrompt, getCurrentApiKey, mapModelForProvider]);
 
   const advanceToNextStep = useCallback(() => {
-    if (workflowState.currentStep < WORKFLOW_STEPS.length - 1) {
+    console.log('advanceToNextStep called');
+    console.log('Current step:', workflowState.currentStep);
+    console.log('WORKFLOW_STEPS.length:', WORKFLOW_STEPS.length);
+
+    // Allow advancing to chapter writing phase (step 6 and beyond)
+    if (workflowState.currentStep < WORKFLOW_STEPS.length + 1) {
+      console.log('Advancing to step:', workflowState.currentStep + 1);
       setWorkflowState(prev => ({
         ...prev,
         currentStep: prev.currentStep + 1,
         error: undefined
       }));
+    } else {
+      console.log('Cannot advance further - at max step');
     }
   }, [workflowState.currentStep]);
 
@@ -482,6 +585,20 @@ function App() {
       processStep(stepId);
     }, 500);
   }, [processStep]);
+
+  const handleChapterFeedback = useCallback((chapterId: number, feedback: string) => {
+    setWorkflowState(prev => ({
+      ...prev,
+      chapters: prev.chapters.map(chapter =>
+        chapter.id === chapterId ? { ...chapter, feedback } : chapter
+      )
+    }));
+
+    // Automatically re-process the chapter with feedback applied
+    setTimeout(() => {
+      processChapter(chapterId);
+    }, 500);
+  }, [processChapter]);
 
   const cancelCurrentRequest = useCallback(() => {
     apiService.cancelCurrentRequest();
@@ -543,7 +660,8 @@ function App() {
       config: {
         ...createDefaultConfig(),
         model: 'deepseek/deepseek-r1', // Better default for OpenRouter
-        temperature: undefined // Reset to empty
+        temperature: undefined, // Reset to empty
+        chapterWordTarget: 3000 // Reset to default
       },
       isProcessing: false,
       error: undefined,
@@ -572,7 +690,8 @@ function App() {
         ...createDefaultConfig(),
         model: currentModel === 'deepseek-reasoner' ? 'deepseek/deepseek-r1' : currentModel, // Better default for OpenRouter
         temperature: currentTemperature, // Keep current temperature setting
-        baseUrl: currentBaseUrl
+        baseUrl: currentBaseUrl,
+        chapterWordTarget: workflowState.config.chapterWordTarget // Keep current chapter word target
       },
       isProcessing: false,
       error: undefined,
@@ -791,13 +910,14 @@ function App() {
                 chapters={workflowState.chapters}
                 onProcessStep={workflowState.currentStep <= 5 ? processStep : processChapter}
                 onAdvanceStep={advanceToNextStep}
-                onFeedback={handleFeedback}
+                onFeedback={workflowState.currentStep <= 5 ? handleFeedback : handleChapterFeedback}
                 onCancel={cancelCurrentRequest}
                 isProcessing={workflowState.isProcessing}
                 streamingContent={workflowState.streamingContent}
                 isStreaming={workflowState.isStreaming}
                 showFeedback={workflowState.showFeedback}
                 onToggleFeedback={toggleFeedback}
+                chapterWordTarget={workflowState.config.chapterWordTarget}
               />
             )}
           </Box>

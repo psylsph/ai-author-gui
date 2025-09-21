@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -10,8 +10,13 @@ import {
   Button,
   Chip,
   LinearProgress,
-  Alert
+  Alert,
+  TextField,
+  Collapse
 } from '@mui/material';
+import {
+  Feedback as FeedbackIcon
+} from '@mui/icons-material';
 import { WORKFLOW_STEPS, WorkflowStep, Chapter } from '../types';
 import WorkflowStepComponent from './WorkflowStep';
 
@@ -28,6 +33,7 @@ interface StepNavigationProps {
   isStreaming: boolean;
   showFeedback: boolean;
   onToggleFeedback: () => void;
+  chapterWordTarget?: number;
 }
 
 const StepNavigation: React.FC<StepNavigationProps> = ({
@@ -42,8 +48,38 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
   streamingContent,
   isStreaming,
   showFeedback,
-  onToggleFeedback
+  onToggleFeedback,
+  chapterWordTarget
 }) => {
+  const [chapterFeedbackStates, setChapterFeedbackStates] = useState<Record<number, boolean>>({});
+  const [chapterFeedbackValues, setChapterFeedbackValues] = useState<Record<number, string>>({});
+
+  const toggleChapterFeedback = (chapterId: number) => {
+    setChapterFeedbackStates(prev => ({
+      ...prev,
+      [chapterId]: !prev[chapterId]
+    }));
+  };
+
+  const handleChapterFeedbackChange = (chapterId: number, feedback: string) => {
+    setChapterFeedbackValues(prev => ({
+      ...prev,
+      [chapterId]: feedback
+    }));
+  };
+
+  const handleChapterFeedbackSubmit = (chapterId: number) => {
+    const feedback = chapterFeedbackValues[chapterId] || '';
+    if (feedback.trim()) {
+      // Update the chapter with feedback
+      onFeedback(chapterId, feedback);
+      // Close feedback section
+      setChapterFeedbackStates(prev => ({
+        ...prev,
+        [chapterId]: false
+      }));
+    }
+  };
   const getStepStatus = (stepIndex: number) => {
     const step = steps[stepIndex];
     if (!step) return 'pending';
@@ -55,7 +91,15 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
 
   const canAdvance = (stepIndex: number) => {
     const step = steps[stepIndex];
-    return step?.completed && stepIndex < steps.length - 1;
+    const canAdvanceResult = step?.completed && stepIndex < steps.length;
+    console.log(`canAdvance(${stepIndex}):`, {
+      stepCompleted: step?.completed,
+      stepIndex,
+      stepsLength: steps.length,
+      result: canAdvanceResult
+    });
+    // Allow advancing from any completed step, including the last regular step
+    return canAdvanceResult;
   };
 
   const getStepContent = (stepIndex: number) => {
@@ -67,12 +111,12 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
       return (
         <Box>
           <Typography variant="body2" paragraph>
-            Write the individual chapters of your story. Each chapter should be at least 3,000 words of narrative prose.
+            Write the individual chapters of your story. Each chapter should be at least {chapterWordTarget || 3000} words of narrative prose.
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {chapters.map((chapter) => (
-              <Paper key={chapter.id} sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Paper key={chapter.id} sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Typography variant="h6" sx={{ flexGrow: 1 }}>
                     Chapter {chapter.id}
                   </Typography>
@@ -85,40 +129,134 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
                   )}
                 </Box>
                 {chapter.isProcessing && (
-                  <LinearProgress sx={{ mb: 1 }} />
+                  <Box sx={{ mb: 2 }}>
+                    <LinearProgress />
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Writing chapter...
+                    </Typography>
+                  </Box>
                 )}
-                {chapter.content && (
-                  <Typography
-                    variant="body2"
+                {/* Show streaming content if chapter is being processed */}
+                {chapter.isProcessing && isStreaming && streamingContent && (
+                  <Box
                     sx={{
-                      maxHeight: '100px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'pre-wrap'
+                      maxHeight: '300px',
+                      overflow: 'auto',
+                      border: '1px solid',
+                      borderColor: 'primary.main',
+                      borderRadius: 1,
+                      p: 2,
+                      mb: 2,
+                      backgroundColor: 'action.hover'
                     }}
                   >
-                    {chapter.content.substring(0, 200)}...
-                  </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        fontFamily: 'monospace',
+                        fontSize: '0.875rem',
+                        lineHeight: 1.5
+                      }}
+                    >
+                      {streamingContent}
+                    </Typography>
+                  </Box>
                 )}
-                <Button
-                  size="small"
-                  variant={chapter.completed ? "outlined" : "contained"}
-                  onClick={() => onProcessStep(chapter.id)}
-                  disabled={chapter.isProcessing || isProcessing}
-                  sx={{ mt: 1 }}
-                >
-                  {chapter.isProcessing ? 'Writing...' : chapter.completed ? 'Rewrite' : 'Write Chapter'}
-                </Button>
-                {chapter.isProcessing && onCancel && (
+
+                {/* Show completed chapter content */}
+                {chapter.content && !chapter.isProcessing && (
+                  <Box
+                    sx={{
+                      maxHeight: '300px',
+                      overflow: 'auto',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      p: 2,
+                      mb: 2,
+                      backgroundColor: 'background.paper'
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        fontFamily: 'monospace',
+                        fontSize: '0.875rem',
+                        lineHeight: 1.5
+                      }}
+                    >
+                      {chapter.content}
+                    </Typography>
+                  </Box>
+                )}
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Button
                     size="small"
-                    variant="outlined"
-                    color="error"
-                    onClick={onCancel}
-                    sx={{ mt: 1 }}
+                    variant={chapter.completed ? "outlined" : "contained"}
+                    onClick={() => onProcessStep(chapter.id)}
+                    disabled={chapter.isProcessing || isProcessing}
                   >
-                    Stop
+                    {chapter.isProcessing ? 'Writing...' : chapter.completed ? 'Rewrite' : 'Write Chapter'}
                   </Button>
+                  {chapter.isProcessing && onCancel && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      onClick={onCancel}
+                    >
+                      Stop
+                    </Button>
+                  )}
+                  {chapter.completed && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<FeedbackIcon />}
+                      onClick={() => toggleChapterFeedback(chapter.id)}
+                    >
+                      Feedback
+                    </Button>
+                  )}
+                </Box>
+
+                {/* Chapter Feedback Section */}
+                {chapter.completed && (
+                  <Collapse in={chapterFeedbackStates[chapter.id] || false}>
+                    <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                      <Typography variant="body2" gutterBottom>
+                        Provide feedback to improve this chapter:
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        placeholder="Enter your feedback here..."
+                        value={chapterFeedbackValues[chapter.id] || ''}
+                        onChange={(e) => handleChapterFeedbackChange(chapter.id, e.target.value)}
+                        sx={{ mb: 1 }}
+                      />
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => handleChapterFeedbackSubmit(chapter.id)}
+                          disabled={!chapterFeedbackValues[chapter.id]?.trim()}
+                        >
+                          Apply Feedback
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => toggleChapterFeedback(chapter.id)}
+                        >
+                          Cancel
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Collapse>
                 )}
               </Paper>
             ))}
@@ -153,7 +291,7 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
         <Typography variant="body1" color="text.secondary" paragraph>
           Follow the structured workflow to create your story with AI assistance.
           Each step builds upon the previous ones to ensure a cohesive narrative.
-          Current chapters target 3000+ words each.
+          Current chapters target {chapterWordTarget || 3000}+ words each.
         </Typography>
 
         {isStreaming && (
