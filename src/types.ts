@@ -28,6 +28,7 @@ export interface StoryConfig {
   baseUrl: string;
   stream: boolean;
   chapterWordTarget?: number; // Target word count per chapter (default: 3000)
+  storyType?: 'short-story' | 'novel'; // Type of story being generated
 }
 
 export interface WorkflowState {

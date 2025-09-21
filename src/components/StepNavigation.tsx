@@ -286,7 +286,7 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
     <Box>
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          AI Story Author
+          AI Author
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
           Follow the structured workflow to create your story with AI assistance.

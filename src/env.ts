@@ -1,4 +1,4 @@
-// Environment variable utilities for AI Story Author
+// Environment variable utilities for AI Author
 
 export interface EnvConfig {
   openai: {
@@ -76,7 +76,7 @@ export const loadEnvConfig = (): EnvConfig => {
       chapterWordTarget: getEnvNumber('VITE_DEFAULT_CHAPTER_WORD_TARGET', 3000),
     },
     app: {
-      title: getEnvVar('VITE_APP_TITLE', 'AI Story Author'),
+      title: getEnvVar('VITE_APP_TITLE', 'AI Author'),
     },
   };
 };

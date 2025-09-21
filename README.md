@@ -1,4 +1,4 @@
-# AI Story Author
+# AI Author
 
 A modern TypeScript React application that helps you create compelling stories using AI assistance. This web-based GUI is equivalent to the original Python CLI tool but with a beautiful, user-friendly interface.
 

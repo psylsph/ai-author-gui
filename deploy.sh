@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# AI Story Author - Docker Deployment Script
+# AI Author - Docker Deployment Script
 # This script makes it easy to deploy the application locally with Docker
 
 set -e
 
-echo "🚀 AI Story Author - Docker Deployment"
+echo "🚀 AI Author - Docker Deployment"
 echo "====================================="
 
 # Check if Docker is installed

@@ -83,6 +83,7 @@ const createDefaultConfig = (): StoryConfig => {
     baseUrl: envConfig.baseUrl,
     stream: envConfig.stream,
     chapterWordTarget: envConfig.chapterWordTarget,
+    storyType: 'short-story',
   };
 };
 
@@ -116,6 +117,7 @@ function App() {
 
   const [showConfig, setShowConfig] = useState(false);
   const [storyPrompt, setStoryPrompt] = useState('Write me a short story about a robot learning to understand human emotions.');
+  const [storyType, setStoryType] = useState<'short-story' | 'novel'>('short-story');
   const [chapterCount, setChapterCount] = useState(3);
   const [suggestedChapterCount, setSuggestedChapterCount] = useState<number | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -281,19 +283,21 @@ function App() {
 
       // Build prompt based on step
       let prompt = '';
+      const storyTypeLabel = storyType === 'short-story' ? 'short story' : 'novel';
+
       if (stepId === 1) {
         // Step 1: Brainstorm & Reflection
-        prompt = `Initial Writing Prompt:\n${storyPrompt}\n--\nYour task is to create a writing plan for this prompt. The scope will be a short story; do not assume a fixed number of chapters yet. Your plan should be comprehensive and in this format:\n# Brainstorming\n<Brainstorm ideas for characters, plot, tone, story beats, and possible pacing. The purpose of brainstorming is to cast a wide net of ideas, not to settle on any specific direction. Think about various ways you could take the prompt.>\n# Reflection\n<Reflect out loud on what works and doesn't work in these ideas. The purpose of this reflection is to narrow in on what you think will work best to make a piece that is a. compelling, and b. fits the prompt requirements. You are not making any decisions just yet, just reflecting.>\nFinally, propose the ideal number of chapters for this short story based on the prompt and your analysis.\nOutput a single line at the end in this exact format so it can be parsed reliably:\nCHAPTER_COUNT: <integer>`;
+        prompt = `Initial Writing Prompt:\n${storyPrompt}\n--\nYour task is to create a writing plan for this prompt. The scope will be a ${storyTypeLabel}; do not assume a fixed number of chapters yet. Your plan should be comprehensive and in this format:\n# Brainstorming\n<Brainstorm ideas for characters, plot, tone, story beats, and possible pacing. The purpose of brainstorming is to cast a wide net of ideas, not to settle on any specific direction. Think about various ways you could take the prompt.>\n# Reflection\n<Reflect out loud on what works and doesn't work in these ideas. The purpose of this reflection is to narrow in on what you think will work best to make a piece that is a. compelling, and b. fits the prompt requirements. You are not making any decisions just yet, just reflecting.>\nFinally, propose the ideal number of chapters for this ${storyTypeLabel} based on the prompt and your analysis.\nOutput a single line at the end in this exact format so it can be parsed reliably:\nCHAPTER_COUNT: <integer>`;
       } else if (stepId === 2) {
         // Step 2: Intention & Chapter Planning - include original prompt context
-        prompt = `Original Story Prompt:\n${storyPrompt}\n\nGreat now let's continue with planning the short story. Output in this format:\n# Intention\n<State your formulated intentions for the piece, synthesised from the parts of the brainstorming session that worked, and avoiding the parts that didn't. Be explicit about the choices you have made about plot, voice, stylistic choices, things you intend to aim for & avoid.>\n# Chapter Planning\n<Write a brief chapter plan for all ${chapterCount} chapters.>`;
+        prompt = `Original Story Prompt:\n${storyPrompt}\n\nGreat now let's continue with planning the ${storyTypeLabel}. Output in this format:\n# Intention\n<State your formulated intentions for the piece, synthesised from the parts of the brainstorming session that worked, and avoiding the parts that didn't. Be explicit about the choices you have made about plot, voice, stylistic choices, things you intend to aim for & avoid.>\n# Chapter Planning\n<Write a brief chapter plan for all ${chapterCount} chapters.>`;
       } else if (stepId === 3) {
         // Step 3: Human vs LLM Critique - include original prompt and previous context
         prompt = `Original Story Prompt:\n${storyPrompt}\n\nWith a view to making the writing more human, discuss how a human might approach this particular piece (given the original prompt). Discuss telltale LLM approaches to writing (generally) and ways they might not serve this particular piece. For example, common LLM failings are to write safely, or to always wrap things up with a bow, or trying to write impressively at the expense of readability. Then do a deep dive on the intention & plan, critiquing ways it might be falling into typical LLM tropes & pitfalls. Brainstorm ideas to make it more human. Be comprehensive. We aren't doing any rewriting of the plan yet, just critique & brainstorming.`;
       } else if (stepId === 4) {
         // Step 4: Final Plan - include original prompt and all previous context
         const wordTarget = workflowState.config.chapterWordTarget || 3000;
-        prompt = `Original Story Prompt:\n${storyPrompt}\n\nOk now with these considerations in mind, formulate the final plan for a human like, compelling short piece in ${chapterCount} chapters. Bear in mind the constraints of the piece (each chapter is approximately ${wordTarget} words). Above all things, the plan must serve the original prompt. We will use the same format as before:\n# Intention\n<State your formulated intentions for the piece, synthesised from the parts of the brainstorming session that worked, and avoiding the parts that didn't. Be explicit about the choices you have made about plot, voice, stylistic choices, things you intend to aim for & avoid.>\n# Chapter Planning\n<Write a brief chapter plan for all ${chapterCount} chapters.>`;
+        prompt = `Original Story Prompt:\n${storyPrompt}\n\nOk now with these considerations in mind, formulate the final plan for a human like, compelling ${storyTypeLabel} in ${chapterCount} chapters. Bear in mind the constraints of the piece (each chapter is approximately ${wordTarget} words). Above all things, the plan must serve the original prompt. We will use the same format as before:\n# Intention\n<State your formulated intentions for the piece, synthesised from the parts of the brainstorming session that worked, and avoiding the parts that didn't. Be explicit about the choices you have made about plot, voice, stylistic choices, things you intend to aim for & avoid.>\n# Chapter Planning\n<Write a brief chapter plan for all ${chapterCount} chapters.>`;
       } else if (stepId === 5) {
         // Step 5: Characters - include original prompt and all previous context
         prompt = `Original Story Prompt:\n${storyPrompt}\n\nPerfect. Now with the outline more crystallised, and bearing in mind the discussion on human writing vs LLM pitfalls, we will flesh out our characters. Lets go through each of our main characters:\n- Write about their background, personality, idiosyncrasies, flaws. Be specific and come up with examples to anchor & ground the character's profile (both core and trivial)\n- Briefly describe their physicality: appearance, how they carry themselves, express, interact with the world.\n- Concisely detail their motives, allegiances and existing relationships. Think from the perspective of the character as a real breathing thinking feeling individual in this world.\n- Write a couple quotes of flavour dialogue / internal monologue from the character to experiment with their voice.\nOutput like this:\n# Character 1 name\n<character exploration>\n# Character 2 name\n<character exploration>\n etc`;
@@ -414,7 +418,7 @@ function App() {
         }));
       }
     }
-  }, [workflowState.config, workflowState.isProcessing, workflowState.steps, messages, chapterCount, getCurrentApiKey, mapModelForProvider, parseChapterCountFromResponse, storyPrompt]);
+  }, [workflowState.config, workflowState.isProcessing, workflowState.steps, messages, chapterCount, storyType, getCurrentApiKey, mapModelForProvider, parseChapterCountFromResponse, storyPrompt]);
 
   const processChapter = useCallback(async (chapterId: number) => {
     if (workflowState.isProcessing) return;
@@ -432,12 +436,13 @@ function App() {
 
     try {
       const wordTarget = workflowState.config.chapterWordTarget || 3000;
+      const chapterStoryTypeLabel = workflowState.config.storyType === 'short-story' ? 'short story' : 'novel';
 
       // Get feedback for current chapter
       const currentChapter = workflowState.chapters.find(chapter => chapter.id === chapterId);
       const chapterFeedback = currentChapter?.feedback || '';
 
-      let chapterPrompt = `Original Story Prompt:\n${storyPrompt}\n\nWrite Chapter ${chapterId} of the story, following the approved plan and prior chapters.\n- Produce at least ${wordTarget} words of narrative prose.\n- Count only the words in your final story text; do not include planning notes or analysis.\n- Output only the polished chapter text (you may open with a 'Chapter ${chapterId}' heading if that matches the style), and do not mention the word count or include any commentary.`;
+      let chapterPrompt = `Original Story Prompt:\n${storyPrompt}\n\nWrite Chapter ${chapterId} of the ${chapterStoryTypeLabel}, following the approved plan and prior chapters.\n- Produce at least ${wordTarget} words of narrative prose.\n- Count only the words in your final story text; do not include planning notes or analysis.\n- Output only the polished chapter text (you may open with a 'Chapter ${chapterId}' heading if that matches the style), and do not mention the word count or include any commentary.`;
 
       // Add feedback to the prompt if it exists
       if (chapterFeedback.trim()) {
@@ -670,6 +675,7 @@ function App() {
       showFeedback: false
     });
     setStoryPrompt('');
+    setStoryType('short-story');
     setChapterCount(5);
     setSuggestedChapterCount(null);
     setApiKeys({});
@@ -691,7 +697,8 @@ function App() {
         model: currentModel === 'deepseek-reasoner' ? 'deepseek/deepseek-r1' : currentModel, // Better default for OpenRouter
         temperature: currentTemperature, // Keep current temperature setting
         baseUrl: currentBaseUrl,
-        chapterWordTarget: workflowState.config.chapterWordTarget // Keep current chapter word target
+        chapterWordTarget: workflowState.config.chapterWordTarget, // Keep current chapter word target
+        storyType: workflowState.config.storyType || 'short-story' // Keep current story type or default to short-story
       },
       isProcessing: false,
       error: undefined,
@@ -700,6 +707,7 @@ function App() {
       showFeedback: false
     });
     setStoryPrompt('Write me a short story about a robot learning to understand human emotions.');
+    setStoryType('short-story');
     setChapterCount(3);
     setSuggestedChapterCount(null);
     setMessages([{ role: 'system', content: 'You are a helpful assistant' }]);
@@ -732,10 +740,11 @@ function App() {
       config: {
         ...prev.config,
         storyPrompt,
-        chapterCount
+        chapterCount,
+        storyType
       }
     }));
-  }, [storyPrompt, chapterCount, getCurrentApiKey]);
+  }, [storyPrompt, storyType, chapterCount, getCurrentApiKey]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -744,7 +753,7 @@ function App() {
         <AppBar position="static">
           <Toolbar>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              AI Story Author
+              AI Author
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Tooltip title="Configuration">
@@ -792,38 +801,68 @@ function App() {
 
           <Box sx={{ p: 3 }}>
             <Typography variant="h4" gutterBottom>
-              AI Story Author
+              AI Author
             </Typography>
 
-            {/* Chapter Count Selector - Always Visible */}
+            {/* Story Configuration - Always Visible */}
             <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.paper' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <Typography variant="h6" sx={{ minWidth: 120 }}>
-                  Chapter Count:
-                </Typography>
-                <TextField
-                  type="number"
-                  value={chapterCount}
-                  onChange={(e) => setChapterCount(parseInt(e.target.value) || 1)}
-                  inputProps={{ min: 1, max: 20 }}
-                  size="small"
-                  sx={{ width: 80 }}
-                />
-                {suggestedChapterCount && suggestedChapterCount !== chapterCount && (
-                  <Chip
-                    label={`AI suggests: ${suggestedChapterCount}`}
-                    color="info"
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <Typography variant="h6" sx={{ minWidth: 120 }}>
+                    Story Type:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant={storyType === 'short-story' ? 'contained' : 'outlined'}
+                      onClick={() => setStoryType('short-story')}
+                      size="small"
+                    >
+                      Short Story
+                    </Button>
+                    <Button
+                      variant={storyType === 'novel' ? 'contained' : 'outlined'}
+                      onClick={() => setStoryType('novel')}
+                      size="small"
+                    >
+                      Novel
+                    </Button>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                    {storyType === 'short-story'
+                      ? "A focused, concise story (typically 1-10 chapters)"
+                      : "A longer, more expansive story (typically 10+ chapters)"
+                    }
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <Typography variant="h6" sx={{ minWidth: 120 }}>
+                    Chapter Count:
+                  </Typography>
+                  <TextField
+                    type="number"
+                    value={chapterCount}
+                    onChange={(e) => setChapterCount(parseInt(e.target.value) || 1)}
+                    inputProps={{ min: 1, max: storyType === 'short-story' ? 20 : 50 }}
                     size="small"
-                    onClick={() => setChapterCount(suggestedChapterCount)}
-                    sx={{ cursor: 'pointer' }}
+                    sx={{ width: 80 }}
                   />
-                )}
-                <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                  {workflowState.currentStep === 0
-                    ? "Suggest the number of chapters for your story"
-                    : "Adjust chapter count if needed"
-                  }
-                </Typography>
+                  {suggestedChapterCount && suggestedChapterCount !== chapterCount && (
+                    <Chip
+                      label={`AI suggests: ${suggestedChapterCount}`}
+                      color="info"
+                      size="small"
+                      onClick={() => setChapterCount(suggestedChapterCount)}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  )}
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                    {workflowState.currentStep === 0
+                      ? "Suggest the number of chapters for your story"
+                      : "Adjust chapter count if needed"
+                    }
+                  </Typography>
+                </Box>
               </Box>
             </Paper>
 
@@ -875,7 +914,7 @@ function App() {
                       sx={{ minWidth: 120 }}
                       disabled={!storyPrompt.trim()}
                     >
-                      Start Story
+                      Start
                     </Button>
                   </Box>
 
